@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CakeInvite — Интерактивное приглашение на детский день рождения</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Nunito', sans-serif;
+      overflow-x: hidden;
+    }
+    .font-display {
+      font-family: 'Comfortaa', cursive, sans-serif;
+    }
+
+    /* Анимация пламени свечи */
+    @keyframes flicker {
+      0%, 100% { transform: scale(1) rotate(-2deg); opacity: 1; }
+      25% { transform: scale(1.08, 0.94) rotate(3deg); opacity: 0.92; }
+      50% { transform: scale(0.95, 1.06) rotate(-1deg); opacity: 1; }
+      75% { transform: scale(1.05, 0.97) rotate(2deg); opacity: 0.95; }
+    }
+    .candle-flame {
+      transform-origin: 50% 85%;
+      animation: flicker 1.1s infinite ease-in-out;
+    }
+
+    /* Дымок после задувания */
+    @keyframes smokeRise {
+      0% { transform: translateY(0) scale(0.6); opacity: 0.85; }
+      100% { transform: translateY(-28px) scale(1.5); opacity: 0; }
+    }
+    .candle-smoke {
+      animation: smokeRise 1.4s ease-out forwards;
+    }
+
+    /* Парящие элементы декора */
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(4deg); }
+    }
+    .float-slow {
+      animation: floatSlow 4.2s ease-in-out infinite;
+    }
+    .float-slow-delay {
+      animation: floatSlow 5s ease-in-out 1.5s infinite;
+    }
+
+    /* Мягкая пульсация кнопки */
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); }
+      50% { box-shadow: 0 0 0 12px rgba(244, 63, 94, 0); }
+    }
+    .pulse-btn {
+      animation: pulseGlow 2.4s infinite;
+    }
+
+    /* Стили для печати приглашения */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #invitation-card, #invitation-card * {
+        visibility: visible;
+      }
+      #invitation-card {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        max-width: 100%;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- Холст для праздничного конфетти -->
+  <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-50"></canvas>
+
+  <!-- Всплывающее уведомление (вместо alert) -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl font-bold text-sm flex items-center gap-2 opacity-0 pointer-events-none transition-all duration-300 translate-y-4">
+    <span id="toast-icon">🎉</span>
+    <span id="toast-text">Готово!</span>
+  </div>
+
+  <!-- Верхняя панель навигации -->
+  <header class="no-print sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center text-white text-xl shadow-md">
+          🎂
+        </div>
+        <div>
+          <span class="font-display font-bold text-lg sm:text-xl bg-gradient-to-r from-pink-600 to-amber-500 bg-clip-text text-transparent">
+            CakeInvite
+          </span>
+          <span class="hidden sm:inline-block ml-2 text-xs font-bold px-2.5 py-0.5 rounded-full bg-pink-100 text-pink-700">
+            Детские приглашения
+          </span>
+        </div>
+      </div>
+
+      <!-- Переключатель режимов -->
+      <div class="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
+        <button id="btn-mode-edit" onclick="setViewMode('edit')" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all bg-white text-slate-900 shadow-sm">
+          ✏️ Конструктор
+        </button>
+        <button id="btn-mode-guest" onclick="setViewMode('guest')" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all text-slate-600 hover:text-slate-900">
+          👀 Глазами гостя
+        </button>
+      </div>
+
+      <!-- Быстрые действия -->
+      <div class="hidden md:flex items-center gap-2">
+        <button onclick="launchConfetti()" class="px-3.5 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold text-xs transition flex items-center gap-1.5">
+          🎉 Салют
+        </button>
+        <button onclick="copyInvitationText()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5">
+          📋 Скопировать текст
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Основной контейнер -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div id="layout-grid" class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+      <!-- ЛЕВАЯ КОЛОНКА: Панель настроек (скрывается в режиме "Глазами гостя") -->
+      <aside id="editor-panel" class="no-print lg:col-span-5 space-y-6 bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-200/80">
+        <div>
+          <h2 class="font-display font-bold text-xl text-slate-900 flex items-center gap-2">
+            🎨 Настройка приглашения
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-500 mt-1">
+            Меняйте тему, тексты и детали — открытка справа обновляется мгновенно.
+          </p>
+        </div>
+
+        <!-- Выбор темы оформления -->
+        <div>
+          <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2.5">
+            1. Выберите стиль праздника
+          </label>
+          <div id="theme-selector" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            <!-- Кнопки тем рендерятся из JS -->
+          </div>
+        </div>
+
+        <!-- Основная информация об имениннике -->
+        <div class="space-y-4 pt-2 border-t border-slate-100">
+          <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500">
+            2. Именинник и возраст
+          </label>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div class="col-span-2">
+              <label class="block text-xs font-bold text-slate-700 mb-1">Имя ребёнка</label>
+              <input id="input-name" type="text" value="Артём" oninput="updateState('childName', this.value)"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 outline-none text-sm font-bold" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Сколько лет</label>
+              <input id="input-age" type="number" min="1" max="18" value="5" oninput="updateState('age', this.value)"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 outline-none text-sm font-bold text-center" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Заголовок приглашения</label>
+            <input id="input-headline" type="text" value="Ура! Мне исполняется 5 лет!" oninput="updateState('headline', this.value)"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 outline-none text-sm font-bold" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Текст приглашения</label>
+            <textarea id="input-message" rows="3" oninput="updateState('message', this.value)"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 outline-none text-sm leading-relaxed">Приглашаю тебя на самый весёлый и сладкий день рождения! Нас ждут игры, сюрпризы, вкусный торт со свечками и море приключений!</textarea>
+          </div>
+        </div>
+
+        <!-- Дата, время и адрес -->
+        <div class="space-y-4 pt-2 border-t border-slate-100">
+          <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500">
+            3. Когда и где встречаемся
+          </label>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Дата праздника</label>
+              <input id="input-date" type="date" value="2026-12-06" oninput="updateState('eventDate', this.value)"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 outline-none text-sm font-bold" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Время начала</label>
+              <input id="input-time" type="text" value="15:00 — 18:00" oninput="updateState('eventTime', this.value)"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 outline-none text-sm font-bold" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Место проведения и адрес</label>
+            <input id="input-location" type="text" value="Детский клуб «Радуга», ул. Ленина, 45" oninput="updateState('location', this.value)"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 outline-none text-sm font-bold" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Пожелания / Дресс-код</label>
+            <input id="input-dresscode" type="text" value="Удобная одежда для игр и отличное настроение!" oninput="updateState('dresscode', this.value)"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 outline-none text-sm" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Контакты родителей (для связи)</label>
+            <input id="input-contact" type="text" value="Мама Анна: +7 (999) 123-45-67" oninput="updateState('contact', this.value)"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 outline-none text-sm font-bold" />
+          </div>
+        </div>
+
+        <!-- Кнопки экспорта для мобильных и десктопа -->
+        <div class="pt-3 border-t border-slate-100 grid grid-cols-2 gap-3">
+          <button onclick="copyInvitationText()" class="py-3 px-4 rounded-2xl bg-pink-500 hover:bg-pink-600 text-white font-extrabold text-xs sm:text-sm shadow-sm transition flex items-center justify-center gap-2">
+            📋 Скопировать текст
+          </button>
+          <button onclick="window.print()" class="py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs sm:text-sm shadow-sm transition flex items-center justify-center gap-2">
+            🖨️ Печать / PDF
+          </button>
+        </div>
+      </aside>
+
+      <!-- ПРАВАЯ КОЛОНКА: Интерактивная открытка-приглашение -->
+      <section id="preview-wrapper" class="lg:col-span-7 flex flex-col items-center">
+
+        <!-- Подсказка над открыткой -->
+        <div class="no-print mb-4 flex flex-wrap items-center justify-center gap-2 text-xs font-bold text-slate-500 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200/70">
+          <span>💡 Интерактив: нажми на свечки на торте, чтобы задуть их и загадать желание!</span>
+        </div>
+
+        <!-- САМА КАРТОЧКА ПРИГЛАШЕНИЯ -->
+        <div id="invitation-card" class="w-full max-w-xl rounded-[2.25rem] shadow-2xl overflow-hidden transition-all duration-500 relative border-4 border-white">
+
+          <!-- Верхняя декоративная шапка с гирляндой и героем темы -->
+          <div id="card-hero-bg" class="relative pt-8 pb-6 px-6 sm:px-10 text-center overflow-hidden transition-colors duration-500">
+
+            <!-- Флажки-гирлянда SVG -->
+            <div class="w-full mb-3 opacity-95">
+              <svg viewBox="0 0 400 44" class="w-full h-9 overflow-visible">
+                <path d="M0,4 Q200,32 400,4" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.5" />
+                <polygon points="28,11 52,15 38,34" fill="#FF6B6B" />
+                <polygon points="75,18 100,20 86,39" fill="#FFD93D" />
+                <polygon points="125,22 150,24 137,43" fill="#6BCB77" />
+                <polygon points="175,24 200,25 188,44" fill="#4D96FF" />
+                <polygon points="225,24 250,22 238,43" fill="#FF8E72" />
+                <polygon points="275,20 300,18 288,39" fill="#C77DFF" />
+                <polygon points="325,15 350,11 338,34" fill="#FFD93D" />
+              </svg>
+            </div>
+
+            <!-- Парящие эмодзи/звёздочки темы -->
+            <div id="floating-left" class="float-slow absolute left-4 top-16 text-3xl sm:text-4xl select-none">🎈</div>
+            <div id="floating-right" class="float-slow-delay absolute right-4 top-16 text-3xl sm:text-4xl select-none">✨</div>
+
+            <!-- Бейдж приглашения -->
+            <div class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow-sm text-xs sm:text-sm font-extrabold uppercase tracking-wider mb-3" id="card-badge">
+              <span>🎉 Приглашение на день рождения</span>
+            </div>
+
+            <!-- Иллюстрация персонажа темы (динамический SVG) -->
+            <div id="theme-mascot" class="mx-auto w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center my-1 drop-shadow-md">
+              <!-- SVG персонажа вставляется через JS -->
+            </div>
+
+            <!-- Имя и возраст -->
+            <h1 id="card-child-title" class="font-display font-bold text-3xl sm:text-4xl tracking-tight mt-2 drop-shadow-sm">
+              Артёму — 5 лет!
+            </h1>
+            <p id="card-headline" class="mt-2 font-extrabold text-base sm:text-lg opacity-95">
+              Ура! Мне исполняется 5 лет!
+            </p>
+          </div>
+
+          <!-- Основное тело открытки -->
+          <div class="bg-white px-6 sm:px-10 pt-6 pb-9 space-y-6">
+
+            <!-- Приветственный текст -->
+            <p id="card-message" class="text-center text-slate-600 text-sm sm:text-base leading-relaxed font-semibold">
+              Приглашаю тебя на самый весёлый и сладкий день рождения! Нас ждут игры, сюрпризы, вкусный торт со свечками и море приключений!
+            </p>
+
+            <!-- ИНТЕРАКТИВНЫЙ ТОРТ СО СВЕЧКАМИ -->
+            <div id="cake-box" class="rounded-3xl p-4 sm:p-5 text-center border-2 border-dashed transition-colors duration-300 bg-rose-50/60 border-rose-200">
+              <div class="flex items-center justify-between mb-1">
+                <span id="candles-status" class="text-xs font-extrabold text-rose-600 bg-white px-3 py-1 rounded-full shadow-xs">
+                  🕯️ Задуй все свечки!
+                </span>
+                <button id="relight-btn" onclick="relightCandles()" class="hidden text-xs font-extrabold text-slate-600 hover:text-rose-600 bg-white px-3 py-1 rounded-full shadow-xs transition">
+                  🔥 Зажечь снова
+                </button>
+              </div>
+
+              <!-- SVG Торт -->
+              <div class="flex justify-center my-1 select-none cursor-pointer" onclick="blowAllCandles()" title="Нажми, чтобы задуть свечки!">
+                <svg id="birthday-cake-svg" viewBox="0 0 260 185" class="w-56 sm:w-64 h-auto overflow-visible">
+                  <!-- Тарелка -->
+                  <ellipse cx="130" cy="170" rx="108" ry="11" fill="#E2E8F0" />
+                  <ellipse cx="130" cy="167" rx="100" ry="8" fill="#F8FAFC" />
+
+                  <!-- Нижний ярус торта -->
+                  <rect x="46" y="114" width="168" height="52" rx="14" fill="#F472B6" />
+                  <!-- Глазурь нижнего яруса -->
+                  <path d="M46,124 Q60,138 74,124 Q88,138 102,124 Q116,138 130,124 Q144,138 158,124 Q172,138 186,124 Q200,138 214,124 L214,118 Q214,112 202,112 L58,112 Q46,112 46,118 Z" fill="#FFF1F2" />
+                  <!-- Украшения-горошины -->
+                  <circle cx="72" cy="148" r="4" fill="#FDE047" />
+                  <circle cx="101" cy="148" r="4" fill="#67E8F9" />
+                  <circle cx="130" cy="148" r="4" fill="#FDE047" />
+                  <circle cx="159" cy="148" r="4" fill="#67E8F9" />
+                  <circle cx="188" cy="148" r="4" fill="#FDE047" />
+
+                  <!-- Верхний ярус торта -->
+                  <rect x="74" y="70" width="112" height="44" rx="12" fill="#FB7185" />
+                  <!-- Глазурь верхнего яруса -->
+                  <path d="M74,80 Q88,93 102,80 Q116,93 130,80 Q144,93 158,80 Q172,93 186,80 L186,74 Q186,68 174,68 L86,68 Q74,68 74,74 Z" fill="#FFFFFF" />
+
+                  <!-- Контейнер для свечек (генерируется динамически по возрасту, макс 7 свечек) -->
+                  <g id="candles-group"></g>
+                </svg>
+              </div>
+              <p id="cake-hint" class="text-xs font-bold text-slate-500">
+                Кликни по тортику или свечкам, чтобы загадать желание ✨
+              </p>
+            </div>
+
+            <!-- Карточки с деталями праздника -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <!-- Дата -->
+              <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl shrink-0">
+                  📅
+                </div>
+                <div>
+                  <div class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Дата</div>
+                  <div id="card-date" class="font-extrabold text-slate-800 text-sm sm:text-base mt-0.5">
+                    6 декабря 2026 (Вс)
+                  </div>
+                </div>
+              </div>
+
+              <!-- Время -->
+              <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-xl shrink-0">
+                  ⏰
+                </div>
+                <div>
+                  <div class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Время</div>
+                  <div id="card-time" class="font-extrabold text-slate-800 text-sm sm:text-base mt-0.5">
+                    15:00 — 18:00
+                  </div>
+                </div>
+              </div>
+
+              <!-- Место -->
+              <div class="sm:col-span-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-3">
+                <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-xl shrink-0">
+                  📍
+                </div>
+                <div class="flex-1">
+                  <div class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Где празднуем</div>
+                  <div id="card-location" class="font-extrabold text-slate-800 text-sm sm:text-base mt-0.5">
+                    Детский клуб «Радуга», ул. Ленина, 45
+                  </div>
+                </div>
+              </div>
+
+              <!-- Пожелания -->
+              <div class="sm:col-span-2 p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl shrink-0">
+                  🎈
+                </div>
+                <div>
+                  <div class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Важно знать</div>
+                  <div id="card-dresscode" class="font-bold text-slate-700 text-xs sm:text-sm mt-0.5">
+                    Удобная одежда для игр и отличное настроение!
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Таймер обратного отсчёта -->
+            <div id="countdown-box" class="rounded-2xl p-4 text-center bg-gradient-to-r from-amber-50 to-pink-50 border border-amber-200/70">
+              <div class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2">
+                ⏳ До начала праздника осталось
+              </div>
+              <div class="grid grid-cols-4 gap-2 max-w-xs mx-auto">
+                <div class="bg-white rounded-xl py-2 px-1 shadow-xs">
+                  <div id="cd-days" class="font-display font-bold text-lg sm:text-xl text-slate-900">14</div>
+                  <div class="text-[10px] font-bold text-slate-400 uppercase">дней</div>
+                </div>
+                <div class="bg-white rounded-xl py-2 px-1 shadow-xs">
+                  <div id="cd-hours" class="font-display font-bold text-lg sm:text-xl text-slate-900">08</div>
+                  <div class="text-[10px] font-bold text-slate-400 uppercase">часов</div>
+                </div>
+                <div class="bg-white rounded-xl py-2 px-1 shadow-xs">
+                  <div id="cd-mins" class="font-display font-bold text-lg sm:text-xl text-slate-900">42</div>
+                  <div class="text-[10px] font-bold text-slate-400 uppercase">минут</div>
+                </div>
+                <div class="bg-white rounded-xl py-2 px-1 shadow-xs">
+                  <div id="cd-secs" class="font-display font-bold text-lg sm:text-xl text-pink-600">19</div>
+                  <div class="text-[10px] font-bold text-slate-400 uppercase">секунд</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ИНТЕРАКТИВНАЯ ФОРМА RSVP ДЛЯ ГОСТЕЙ -->
+            <div class="no-print pt-2 border-t border-slate-100">
+              <div class="text-center mb-4">
+                <h3 class="font-display font-bold text-lg text-slate-900">
+                  💌 Подтвердите участие (RSVP)
+                </h3>
+                <p class="text-xs text-slate-500 font-semibold mt-0.5">
+                  Напишите, пожалуйста, сможете ли вы прийти, чтобы мы подготовили угощения!
+                </p>
+              </div>
+
+              <form id="rsvp-form" onsubmit="submitRsvp(event)" class="space-y-3 bg-slate-50 p-4 sm:p-5 rounded-3xl border border-slate-200/70">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Имя гостя (ребёнка / семьи)</label>
+                    <input id="rsvp-name" type="text" required placeholder="Например: Саша и мама Оля"
+                      class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 focus:border-pink-400 outline-none text-sm font-bold" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Сколько вас будет?</label>
+                    <select id="rsvp-guests" class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 focus:border-pink-400 outline-none text-sm font-bold">
+                      <option value="1 ребёнок + 1 взрослый">1 ребёнок + 1 взрослый</option>
+                      <option value="1 ребёнок (без взрослых)">1 ребёнок (без взрослых)</option>
+                      <option value="2 детей + 1 взрослый">2 детей + 1 взрослый</option>
+                      <option value="Всей семьёй (3-4 чел.)">Всей семьёй (3-4 чел.)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold text-slate-600 mb-1">Пожелания или аллергии на продукты (необязательно)</label>
+                  <input id="rsvp-note" type="text" placeholder="Всё едим с удовольствием! / Без орехов"
+                    class="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 focus:border-pink-400 outline-none text-xs sm:text-sm" />
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5 pt-1">
+                  <button type="submit" onclick="rsvpChoice='yes'" class="pulse-btn py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold text-xs sm:text-sm shadow-md transition">
+                    🎉 Обязательно придём!
+                  </button>
+                  <button type="submit" onclick="rsvpChoice='no'" class="py-3 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 font-extrabold text-xs sm:text-sm transition">
+                    😢 К сожалению, не сможем
+                  </button>
+                </div>
+              </form>
+
+              <!-- Список ответивших гостей (демо-состояние) -->
+              <div id="rsvp-list-container" class="mt-4 hidden">
+                <div class="text-xs font-extrabold text-slate-500 uppercase tracking-wider mb-2">
+                  Уже ответили (<span id="rsvp-count">0</span>):
+                </div>
+                <div id="rsvp-list" class="space-y-2"></div>
+              </div>
+            </div>
+
+            <!-- Контакт в подвале открытки -->
+            <div class="text-center pt-3 border-t border-slate-100">
+              <div class="text-xs font-bold text-slate-400">По всем вопросам звоните или пишите:</div>
+              <div id="card-contact" class="font-extrabold text-sm sm:text-base text-slate-800 mt-1">
+                📞 Мама Анна: +7 (999) 123-45-67
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    // ==========================================
+    // 1. ТЕМЫ ОФОРМЛЕНИЯ ДЕТСКОГО ПРАЗДНИКА
+    // ==========================================
+    const THEMES = {
+      cake: {
+        id: 'cake',
+        name: 'Сладкий тортик',
+        icon: '🎂',
+        heroBg: 'bg-gradient-to-br from-pink-400 via-rose-400 to-amber-300 text-white',
+        badgeText: 'text-rose-600',
+        cakeBoxBg: 'bg-rose-50/70 border-rose-200',
+        floatLeft: '🎈',
+        floatRight: '🍭',
+        mascotSvg: `
+          <svg viewBox="0 0 120 120" class="w-full h-full">
+            <circle cx="60" cy="60" r="52" fill="#FFF1F2" />
+            <rect x="28" y="64" width="64" height="32" rx="10" fill="#F43F5E" />
+            <path d="M28,72 Q38,82 48,72 Q58,82 68,72 Q78,82 92,72 L92,66 Q92,60 84,60 L36,60 Q28,60 28,66 Z" fill="#FFFFFF" />
+            <rect x="42" y="42" width="36" height="22" rx="8" fill="#FB7185" />
+            <rect x="57" y="22" width="6" height="20" rx="3" fill="#FBBF24" />
+            <path d="M60,8 C65,15 65,21 60,22 C55,21 55,15 60,8 Z" fill="#F97316" />
+            <circle cx="48" cy="80" r="3" fill="#FFFFFF" />
+            <circle cx="72" cy="80" r="3" fill="#FFFFFF" />
+            <path d="M55,84 Q60,89 65,84" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" />
+          </svg>
+        `
+      },
+      safari: {
+        id: 'safari',
+        name: 'Весёлый львёнок',
+        icon: '🦁',
+        heroBg: 'bg-gradient-to-br from-sky-400 via-cyan-400 to-amber-300 text-white',
+        badgeText: 'text-sky-700',
+        cakeBoxBg: 'bg-amber-50/80 border-amber-200',
+        floatLeft: '🌴',
+        floatRight: '🎈',
+        mascotSvg: `
+          <svg viewBox="0 0 120 120" class="w-full h-full">
+            <circle cx="60" cy="62" r="44" fill="#F59E0B" />
+            <circle cx="60" cy="62" r="32" fill="#FDE68A" />
+            <circle cx="38" cy="38" r="10" fill="#FBBF24" />
+            <circle cx="82" cy="38" r="10" fill="#FBBF24" />
+            <circle cx="50" cy="58" r="3.5" fill="#1E293B" />
+            <circle cx="70" cy="58" r="3.5" fill="#1E293B" />
+            <polygon points="56,66 64,66 60,71" fill="#EA580C" />
+            <path d="M52,75 Q60,82 68,75" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" />
+            <polygon points="60,8 48,30 72,30" fill="#EC4899" />
+            <circle cx="60" cy="8" r="4" fill="#FDE047" />
+          </svg>
+        `
+      },
+      space: {
+        id: 'space',
+        name: 'Космос и ракеты',
+        icon: '🚀',
+        heroBg: 'bg-gradient-to-br from-indigo-900 via-purple-800 to-blue-700 text-white',
+        badgeText: 'text-indigo-700',
+        cakeBoxBg: 'bg-indigo-50/80 border-indigo-200',
+        floatLeft: '🪐',
+        floatRight: '⭐',
+        mascotSvg: `
+          <svg viewBox="0 0 120 120" class="w-full h-full">
+            <circle cx="60" cy="60" r="52" fill="#312E81" />
+            <path d="M60,18 C76,34 78,64 74,82 L46,82 C42,64 44,34 60,18 Z" fill="#F8FAFC" />
+            <path d="M60,18 C67,26 70,34 71,40 L49,40 C50,34 53,26 60,18 Z" fill="#F43F5E" />
+            <polygon points="46,66 32,84 46,82" fill="#F43F5E" />
+            <polygon points="74,66 88,84 74,82" fill="#F43F5E" />
+            <circle cx="60" cy="54" r="10" fill="#38BDF8" stroke="#CBD5E1" stroke-width="3" />
+            <path d="M52,84 Q60,106 68,84 Z" fill="#FBBF24" />
+          </svg>
+        `
+      },
+      dino: {
+        id: 'dino',
+        name: 'Дино-вечеринка',
+        icon: '🦖',
+        heroBg: 'bg-gradient-to-br from-emerald-500 via-teal-500 to-lime-400 text-white',
+        badgeText: 'text-emerald-700',
+        cakeBoxBg: 'bg-emerald-50/80 border-emerald-200',
+        floatLeft: '🌿',
+        floatRight: '🥚',
+        mascotSvg: `
+          <svg viewBox="0 0 120 120" class="w-full h-full">
+            <circle cx="60" cy="60" r="52" fill="#ECFDF5" />
+            <polygon points="42,32 50,22 56,32" fill="#F59E0B" />
+            <polygon points="56,30 64,20 70,30" fill="#F59E0B" />
+            <path d="M38,88 C38,52 46,32 66,32 C82,32 90,44 86,58 C82,68 72,68 72,76 L72,92 L42,92 Z" fill="#10B981" />
+            <circle cx="72" cy="46" r="4" fill="#1E293B" />
+            <circle cx="73" cy="45" r="1.5" fill="#FFFFFF" />
+            <path d="M72,56 Q78,60 83,55" fill="none" stroke="#064E3B" stroke-width="2.5" stroke-linecap="round" />
+          </svg>
+        `
+      },
+      unicorn: {
+        id: 'unicorn',
+        name: 'Волшебный единорог',
+        icon: '🦄',
+        heroBg: 'bg-gradient-to-br from-fuchsia-400 via-purple-400 to-pink-300 text-white',
+        badgeText: 'text-purple-700',
+        cakeBoxBg: 'bg-fuchsia-50/80 border-fuchsia-200',
+        floatLeft: '🌈',
+        floatRight: '✨',
+        mascotSvg: `
+          <svg viewBox="0 0 120 120" class="w-full h-full">
+            <circle cx="60" cy="60" r="52" fill="#FAF5FF" />
+            <polygon points="60,14 53,42 67,42" fill="#FBBF24" />
+            <path d="M40,86 C40,56 48,40 60,40 C72,40 80,56 80,86 Z" fill="#FFFFFF" stroke="#E9D5FF" stroke-width="2" />
+            <circle cx="44" cy="46" r="8" fill="#F472B6" />
+            <circle cx="76" cy="46" r="8" fill="#C084FC" />
+            <circle cx="52" cy="62" r="3" fill="#3B0764" />
+            <circle cx="68" cy="62" r="3" fill="#3B0764" />
+            <ellipse cx="60" cy="74" rx="12" ry="8" fill="#FBCFE8" />
+          </svg>
+        `
+      }
+    };
+
+    // ==========================================
+    // 2. СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+    // ==========================================
+    const state = {
+      theme: 'safari',
+      childName: 'Артём',
+      age: 5,
+      headline: 'Ура! Мне исполняется 5 лет!',
+      message: 'Приглашаю тебя на самый весёлый и сладкий день рождения! Нас ждут игры, сюрпризы, вкусный торт со свечками и море приключений!',
+      eventDate: '2026-12-06',
+      eventTime: '15:00 — 18:00',
+      location: 'Детский клуб «Радуга», ул. Ленина, 45',
+      dresscode: 'Удобная одежда для игр и отличное настроение!',
+      contact: 'Мама Анна: +7 (999) 123-45-67',
+      candlesLit: [],
+      rsvpResponses: []
+    };
+
+    let rsvpChoice = 'yes';
+
+    // ==========================================
+    // 3. ИНИЦИАЛИЗАЦИЯ И РЕНДЕР ТЕМ
+    // ==========================================
+    function renderThemeButtons() {
+      const container = document.getElementById('theme-selector');
+      container.innerHTML = Object.values(THEMES).map(t => {
+        const active = state.theme === t.id;
+        return `
+          <button type="button" onclick="selectTheme('${t.id}')"
+            class="p-2.5 rounded-2xl border-2 text-left transition flex items-center gap-2 ${
+              active
+                ? 'border-pink-500 bg-pink-50/70 shadow-xs'
+                : 'border-slate-200 hover:border-slate-300 bg-white'
+            }">
+            <span class="text-xl">${t.icon}</span>
+            <span class="text-xs font-extrabold text-slate-800 leading-tight">${t.name}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function selectTheme(themeId) {
+      state.theme = themeId;
+      renderThemeButtons();
+      applyTheme();
+      launchConfetti(45);
+    }
+
+    function applyTheme() {
+      const t = THEMES[state.theme];
+      const hero = document.getElementById('card-hero-bg');
+      hero.className = `relative pt-8 pb-6 px-6 sm:px-10 text-center overflow-hidden transition-colors duration-500 ${t.heroBg}`;
+
+      const badge = document.getElementById('card-badge');
+      badge.className = `inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/95 backdrop-blur-sm shadow-sm text-xs sm:text-sm font-extrabold uppercase tracking-wider mb-3 ${t.badgeText}`;
+
+      const cakeBox = document.getElementById('cake-box');
+      cakeBox.className = `rounded-3xl p-4 sm:p-5 text-center border-2 border-dashed transition-colors duration-300 ${t.cakeBoxBg}`;
+
+      document.getElementById('floating-left').textContent = t.floatLeft;
+      document.getElementById('floating-right').textContent = t.floatRight;
+      document.getElementById('theme-mascot').innerHTML = t.mascotSvg;
+    }
+
+    // ==========================================
+    // 4. СКЛОНЕНИЕ ИМЕНИ И ВОЗРАСТА
+    // ==========================================
+    function getAgeWord(age) {
+      const n = Math.abs(parseInt(age, 10)) || 1;
+      const mod100 = n % 100;
+      const mod10 = n % 10;
+      if (mod100 >= 11 && mod100 <= 14) return 'лет';
+      if (mod10 === 1) return 'год';
+      if (mod10 >= 2 && mod10 <= 4) return 'года';
+      return 'лет';
+    }
+
+    function formatRussianDate(isoDate) {
+      if (!isoDate) return 'Скоро!';
+      try {
+        const [y, m, d] = isoDate.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        const months = [
+          'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+          'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+        ];
+        const weekdays = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+        return `${d} ${months[m - 1]} ${y} (${weekdays[dateObj.getDay()]})`;
+      } catch {
+        return isoDate;
+      }
+    }
+
+    function updateState(key, value) {
+      state[key] = value;
+
+      if (key === 'age') {
+        const count = Math.min(Math.max(parseInt(value, 10) || 1, 1), 8);
+        state.candlesLit = Array(count).fill(true);
+        renderCandles();
+      }
+
+      renderInvitationContent();
+    }
+
+    function renderInvitationContent() {
+      const ageNum = parseInt(state.age, 10) || 5;
+      const nameClean = state.childName.trim() || 'Именинник';
+      document.getElementById('card-child-title').textContent = `${nameClean} • ${ageNum} ${getAgeWord(ageNum)}!`;
+      document.getElementById('card-headline').textContent = state.headline;
+      document.getElementById('card-message').textContent = state.message;
+      document.getElementById('card-date').textContent = formatRussianDate(state.eventDate);
+      document.getElementById('card-time').textContent = state.eventTime;
+      document.getElementById('card-location').textContent = state.location;
+      document.getElementById('card-dresscode').textContent = state.dresscode;
+      document.getElementById('card-contact').textContent = `📞 ${state.contact}`;
+    }
+
+    // ==========================================
+    // 5. ИНТЕРАКТИВНЫЕ СВЕЧКИ НА ТОРТЕ
+    // ==========================================
+    function initCandles() {
+      const count = Math.min(Math.max(parseInt(state.age, 10) || 5, 1), 8);
+      state.candlesLit = Array(count).fill(true);
+      renderCandles();
+    }
+
+    function renderCandles() {
+      const group = document.getElementById('candles-group');
+      const count = state.candlesLit.length;
+      const startX = 130 - ((count - 1) * 14) / 2;
+      const colors = ['#38BDF8', '#FACC15', '#A855F7', '#34D399', '#F43F5E', '#FB923C', '#60A5FA', '#EC4899'];
+
+      group.innerHTML = state.candlesLit.map((isLit, i) => {
+        const x = startX + i * 14;
+        const color = colors[i % colors.length];
+        return `
+          <g transform="translate(${x}, 38)" onclick="event.stopPropagation(); blowSingleCandle(${i})" class="cursor-pointer">
+            <!-- Тело свечки -->
+            <rect x="-3.5" y="10" width="7" height="22" rx="2.5" fill="${color}" />
+            <line x1="-3.5" y1="16" x2="3.5" y2="19" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7" />
+            <line x1="-3.5" y1="23" x2="3.5" y2="26" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7" />
+            <!-- Фитиль -->
+            <line x1="0" y1="6" x2="0" y2="10" stroke="#334155" stroke-width="1.5" />
+            ${
+              isLit
+                ? `
+                  <!-- Огонёк -->
+                  <g class="candle-flame">
+                    <path d="M0,-6 C5,1 5,7 0,8 C-5,7 -5,1 0,-6 Z" fill="#F97316" />
+                    <path d="M0,-2 C2.5,2 2.5,6 0,7 C-2.5,6 -2.5,2 0,-2 Z" fill="#FEF08A" />
+                  </g>
+                `
+                : `
+                  <!-- Дымок -->
+                  <circle cx="0" cy="2" r="2.5" fill="#94A3B8" class="candle-smoke" />
+                `
+            }
+          </g>
+        `;
+      }).join('');
+
+      const anyLit = state.candlesLit.some(Boolean);
+      const statusEl = document.getElementById('candles-status');
+      const relightBtn = document.getElementById('relight-btn');
+      const hintEl = document.getElementById('cake-hint');
+
+      if (anyLit) {
+        statusEl.textContent = '🕯️ Задуй все свечки!';
+        relightBtn.classList.add('hidden');
+        hintEl.textContent = 'Кликни по свечкам или по тортику, чтобы загадать желание ✨';
+      } else {
+        statusEl.textContent = '🎉 Ура! Желание загадано!';
+        relightBtn.classList.remove('hidden');
+        hintEl.textContent = 'С днём рождения! Пусть сбудутся все мечты! 🌟';
+      }
+    }
+
+    function blowSingleCandle(index) {
+      if (!state.candlesLit[index]) return;
+      state.candlesLit[index] = false;
+      playPopSound();
+      renderCandles();
+
+      if (!state.candlesLit.some(Boolean)) {
+        launchConfetti(140);
+        showToast('🎂 Все свечки задуты! С Днём Рождения!');
+      }
+    }
+
+    function blowAllCandles() {
+      if (!state.candlesLit.some(Boolean)) return;
+      state.candlesLit = state.candlesLit.map(() => false);
+      playPopSound();
+      renderCandles();
+      launchConfetti(140);
+      showToast('🎂 Ура! Все свечки задуты!');
+    }
+
+    function relightCandles() {
+      state.candlesLit = state.candlesLit.map(() => true);
+      renderCandles();
+    }
+
+    // Лёгкий синтезированный звук через Web Audio API (без внешних файлов)
+    function playPopSound() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      } catch (e) {
+        // Игнорируем, если звук заблокирован браузером
+      }
+    }
+
+    // ==========================================
+    // 6. ТАЙМЕР ОБРАТНОГО ОТСЧЁТА
+    // ==========================================
+    function updateCountdown() {
+      const targetStr = state.eventDate ? `${state.eventDate}T15:00:00` : null;
+      const target = targetStr ? new Date(targetStr) : new Date(Date.now() + 14 * 86400000);
+      const now = new Date();
+      let diff = Math.max(0, target - now);
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      diff -= days * (1000 * 60 * 60 * 24);
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      diff -= hours * (1000 * 60 * 60);
+      const mins = Math.floor(diff / (1000 * 60));
+      diff -= mins * (1000 * 60);
+      const secs = Math.floor(diff / 1000);
+
+      document.getElementById('cd-days').textContent = String(days).padStart(2, '0');
+      document.getElementById('cd-hours').textContent = String(hours).padStart(2, '0');
+      document.getElementById('cd-mins').textContent = String(mins).padStart(2, '0');
+      document.getElementById('cd-secs').textContent = String(secs).padStart(2, '0');
+    }
+
+    // ==========================================
+    // 7. РЕЖИМЫ ПРОСМОТРА (КОНСТРУКТОР / ГОСТЬ)
+    // ==========================================
+    function setViewMode(mode) {
+      const editor = document.getElementById('editor-panel');
+      const previewWrapper = document.getElementById('preview-wrapper');
+      const btnEdit = document.getElementById('btn-mode-edit');
+      const btnGuest = document.getElementById('btn-mode-guest');
+
+      if (mode === 'guest') {
+        editor.classList.add('hidden');
+        previewWrapper.classList.remove('lg:col-span-7');
+        previewWrapper.classList.add('lg:col-span-12');
+
+        btnGuest.className = 'px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all bg-white text-slate-900 shadow-sm';
+        btnEdit.className = 'px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all text-slate-600 hover:text-slate-900';
+        launchConfetti(60);
+      } else {
+        editor.classList.remove('hidden');
+        previewWrapper.classList.remove('lg:col-span-12');
+        previewWrapper.classList.add('lg:col-span-7');
+
+        btnEdit.className = 'px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all bg-white text-slate-900 shadow-sm';
+        btnGuest.className = 'px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all text-slate-600 hover:text-slate-900';
+      }
+    }
+
+    // ==========================================
+    // 8. RSVP ФОРМА ГОСТЯ
+    // ==========================================
+    function submitRsvp(e) {
+      e.preventDefault();
+      const nameInput = document.getElementById('rsvp-name');
+      const guestsSelect = document.getElementById('rsvp-guests');
+      const noteInput = document.getElementById('rsvp-note');
+
+      const entry = {
+        name: nameInput.value.trim(),
+        guests: guestsSelect.value,
+        note: noteInput.value.trim(),
+        attending: rsvpChoice === 'yes'
+      };
+
+      if (!entry.name) return;
+
+      state.rsvpResponses.unshift(entry);
+      renderRsvpList();
+
+      nameInput.value = '';
+      noteInput.value = '';
+
+      if (entry.attending) {
+        launchConfetti(110);
+        showToast(`🎉 Ура! ${entry.name} в списке гостей!`);
+      } else {
+        showToast('💌 Спасибо за ответ! Будем скучать!');
+      }
+    }
+
+    function renderRsvpList() {
+      const container = document.getElementById('rsvp-list-container');
+      const list = document.getElementById('rsvp-list');
+      const count = document.getElementById('rsvp-count');
+
+      if (state.rsvpResponses.length === 0) {
+        container.classList.add('hidden');
+        return;
+      }
+
+      container.classList.remove('hidden');
+      count.textContent = state.rsvpResponses.length;
+
+      list.innerHTML = state.rsvpResponses.map(item => `
+        <div class="p-3 rounded-2xl bg-white border border-slate-200/80 flex items-center justify-between gap-2 text-xs">
+          <div>
+            <div class="font-extrabold text-slate-800">${escapeHtml(item.name)}</div>
+            <div class="text-slate-500 mt-0.5">${escapeHtml(item.guests)}${item.note ? ' • ' + escapeHtml(item.note) : ''}</div>
+          </div>
+          <span class="px-2.5 py-1 rounded-full font-extrabold shrink-0 ${
+            item.attending ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+          }">
+            ${item.attending ? '🎉 Придёт' : '😢 Не сможет'}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    // ==========================================
+    // 9. КОПИРОВАНИЕ ТЕКСТА И УВЕДОМЛЕНИЯ
+    // ==========================================
+    function copyInvitationText() {
+      const ageNum = parseInt(state.age, 10) || 5;
+      const text = [
+        `🎂 ПРИГЛАШЕНИЕ НА ДЕНЬ РОЖДЕНИЯ!`,
+        `${state.childName} исполняется ${ageNum} ${getAgeWord(ageNum)}!`,
+        ``,
+        `${state.headline}`,
+        `${state.message}`,
+        ``,
+        `📅 Дата: ${formatRussianDate(state.eventDate)}`,
+        `⏰ Время: ${state.eventTime}`,
+        `📍 Место: ${state.location}`,
+        `🎈 Пожелания: ${state.dresscode}`,
+        `📞 Связь: ${state.contact}`
+      ].join('\n');
+
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('📋 Текст приглашения скопирован в буфер обмена!');
+      } catch {
+        showToast('⚠️ Не удалось скопировать текст');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    let toastTimeout;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-text').textContent = msg;
+      toast.classList.remove('opacity-0', 'translate-y-4');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-4');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 3000);
+    }
+
+    // ==========================================
+    // 10. КОНФЕТТИ АНИМАЦИЯ НА CANVAS
+    // ==========================================
+    const canvas = document.getElementById('confetti-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let animId = null;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function launchConfetti(amount = 90) {
+      const palette = ['#F43F5E', '#FBBF24', '#34D399', '#38BDF8', '#A855F7', '#FB7185'];
+      for (let i = 0; i < amount; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: -10 - Math.random() * 120,
+          w: 7 + Math.random() * 6,
+          h: 10 + Math.random() * 8,
+          vx: (Math.random() - 0.5) * 4,
+          vy: 2.5 + Math.random() * 4.5,
+          rot: Math.random() * 360,
+          vRot: (Math.random() - 0.5) * 10,
+          color: palette[Math.floor(Math.random() * palette.length)]
+        });
+      }
+      if (!animId) animateConfetti();
+    }
+
+    function animateConfetti() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.vRot;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rot * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+
+      particles = particles.filter(p => p.y < canvas.height + 30);
+      if (particles.length > 0) {
+        animId = requestAnimationFrame(animateConfetti);
+      } else {
+        animId = null;
+      }
+    }
+
+    // ==========================================
+    // СТАРТ ПРИЛОЖЕНИЯ
+    // ==========================================
+    window.onload = () => {
+      renderThemeButtons();
+      applyTheme();
+      initCandles();
+      renderInvitationContent();
+      updateCountdown();
+      setInterval(updateCountdown, 1000);
+      setTimeout(() => launchConfetti(60), 400);
+    };
+  </script>
+</body>
+</html>
